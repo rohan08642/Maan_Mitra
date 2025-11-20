@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maan Mitra - Local AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        .dark body { background-color: #1a1a1a; }
+        #chat-window { scroll-behavior: smooth; }
+        .chat-bubble { max-width: 80%; word-wrap: break-word; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .recording { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); } }
+        .modal-overlay { transition: opacity 0.3s ease; }
+        #breathing-circle { transition: transform 4s ease-in-out; }
+        @keyframes breathe { 0%, 100% { transform: scale(0.6); } 50% { transform: scale(1); } }
+        .breathing-animation { animation: breathe 8s ease-in-out infinite; }
+        #mood-tracker-container, #journal-modal, #report-modal { transition: all 0.5s ease-in-out; }
+        #chat-window::-webkit-scrollbar { width: 6px; }
+        #chat-window::-webkit-scrollbar-track { background: transparent; }
+        #chat-window::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .dark #chat-window::-webkit-scrollbar-thumb { background-color: #4b5563; }
+        #image-preview-container { transition: all 0.3s ease-in-out; }
+        .journal-entry:hover { background-color: #f9fafb; }
+        .dark .journal-entry:hover { background-color: #1f2937; }
+        /* Naye button ke liye style */
+        .action-button {
+            margin-top: 8px;
+            margin-right: 8px;
+            text-xs: 12px;
+            font-weight: 500;
+            background-color: #ffffff;
+            border: 1px solid #d1d5db;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            transition: background-color 0.2s;
+        }
+        .dark .action-button {
+            background-color: #374151; /* dark:bg-gray-700 */
+            border-color: #4b5563; /* dark:border-gray-600 */
+        }
+        .action-button:hover {
+            background-color: #f3f4f6; /* hover:bg-gray-100 */
+        }
+        .dark .action-button:hover {
+            background-color: #4b5563; /* dark:hover:bg-gray-600 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 h-screen">
+    <div class="w-full h-full flex flex-col bg-white dark:bg-gray-800">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 p-4 flex items-center justify-between shadow-sm border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center space-x-4">
+                <div class="p-2 bg-teal-500 rounded-full"><i class="fas fa-hand-holding-heart text-2xl text-white"></i></div>
+                <div>
+                    <h1 class="text-xl font-bold text-teal-600 dark:text-teal-400">Maan Mitra</h1>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Your Student Wellness Assistant (Local)</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-1 text-blue-500 bg-blue-50 dark:bg-blue-900/50 rounded-full px-3 py-1" title="Emotional Growth Index">
+                    <i class="fas fa-chart-line"></i>
+                    <span id="egi-score" class="font-bold">...</span>
+                </div>
+                <button id="toggle-report-btn" class="text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><i class="fas fa-user-graduate text-xl"></i></button>
+                <button id="toggle-journal-btn" class="text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><i class="fas fa-book-open text-xl"></i></button>
+            </div>
+        </header>
+
+        <!-- Chat Window -->
+        <main id="chat-window" class="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900"><div id="message-container" class="space-y-5"></div></main>
+        
+        <!-- Image Preview Area -->
+        <div id="image-preview-container" class="p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hidden">
+            <div class="relative w-20 h-20"><img id="image-preview" src="" class="w-full h-full object-cover rounded-md" alt="Image preview"><button id="remove-image-btn" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs">&times;</button></div>
+        </div>
+
+        <!-- Input Area -->
+        <footer class="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+            <div class="flex items-center space-x-3">
+                <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+                <button id="image-upload-btn" class="text-gray-500 hover:text-teal-600 rounded-full p-3 transition-colors"><i class="fas fa-paperclip text-xl"></i></button>
+                <input type="text" id="user-input" class="flex-1 w-full px-5 py-3 bg-gray-100 dark:bg-gray-700 border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Type or press the mic...">
+                <button id="mic-btn" class="text-gray-500 hover:text-red-500 rounded-full p-3 transition-colors"><i class="fas fa-microphone text-xl"></i></button>
+                <button id="send-btn" class="bg-teal-500 text-white rounded-full p-3 hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-teal-300"><i class="fas fa-paper-plane text-lg"></i></button>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Modals -->
+    <div id="journal-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-2xl w-full text-left relative h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b dark:border-gray-600">
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Your Smart Journal</h3>
+                <button id="close-journal-modal" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl">&times;</button>
+            </div>
+            <div id="journal-insights" class="mb-4 p-4 bg-teal-50 dark:bg-teal-900/50 rounded-lg text-teal-800 dark:text-teal-200 text-sm">Loading insights...</div>
+            <div id="journal-content" class="flex-1 overflow-y-auto space-y-4 pr-2"></div>
+        </div>
+    </div>
+
+    <div id="report-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-2xl w-full text-left relative h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-4 border-b dark:border-gray-600">
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Personality Mirror Report</h3>
+                <button id="close-report-modal" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl">&times;</button>
+            </div>
+            <div id="report-content" class="flex-1 overflow-y-auto space-y-4 pr-2">
+                <p class="text-gray-500">Generating your report... This requires at least 10 journal entries.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        // --- REMOVED ALL FIREBASE IMPORTS ---
+
+        // --- LOCAL STORAGE SETUP ---
+        const storage = {
+            getProfile: () => {
+                const profile = localStorage.getItem('maanMitraProfile');
+                return profile ? JSON.parse(profile) : { egiScore: 50, lastUpdated: new Date().toISOString() };
+            },
+            saveProfile: (profile) => {
+                localStorage.setItem('maanMitraProfile', JSON.stringify(profile));
+            },
+            getJournal: () => {
+                const journal = localStorage.getItem('maanMitraJournal');
+                return journal ? JSON.parse(journal) : [];
+            },
+            saveJournal: (journal) => {
+                localStorage.setItem('maanMitraJournal', JSON.stringify(journal));
+            }
+        };
+
+        const ui = {
+            chatWindow: document.getElementById('chat-window'), messageContainer: document.getElementById('message-container'),
+            userInput: document.getElementById('user-input'), sendBtn: document.getElementById('send-btn'), micBtn: document.getElementById('mic-btn'),
+            imageUploadBtn: document.getElementById('image-upload-btn'), imageUploadInput: document.getElementById('image-upload-input'),
+            imagePreviewContainer: document.getElementById('image-preview-container'), imagePreview: document.getElementById('image-preview'), removeImageBtn: document.getElementById('remove-image-btn'),
+            egiScore: document.getElementById('egi-score'), toggleJournalBtn: document.getElementById('toggle-journal-btn'),
+            journalModal: document.getElementById('journal-modal'), closeJournalModal: document.getElementById('close-journal-modal'),
+            journalContent: document.getElementById('journal-content'), journalInsights: document.getElementById('journal-insights'),
+            toggleReportBtn: document.getElementById('toggle-report-btn'), reportModal: document.getElementById('report-modal'),
+            closeReportModal: document.getElementById('close-report-modal'), reportContent: document.getElementById('report-content')
+        };
+        let uploadedImage = null;
+
+        // --- REMOVED initializeAuth ---
+        
+        function loadInitialData() {
+            const profile = storage.getProfile();
+            ui.egiScore.textContent = profile.egiScore.toFixed(0) || '50';
+            addMessage('bot', { response: "Hello! I'm Maan Mitra. How are you feeling today? Let's reflect together." });
+        }
+        // Load data immediately
+        loadInitialData();
+        
+        // --- EVENT LISTENERS ---
+        ui.toggleJournalBtn.addEventListener('click', () => { ui.journalModal.classList.remove('hidden'); loadJournalEntries(); });
+        ui.closeJournalModal.addEventListener('click', () => ui.journalModal.classList.add('hidden'));
+        ui.toggleReportBtn.addEventListener('click', () => { ui.reportModal.classList.remove('hidden'); generateMirrorReport(); });
+        ui.closeReportModal.addEventListener('click', () => ui.reportModal.classList.add('hidden'));
+        ui.sendBtn.addEventListener('click', handleSendMessage);
+        ui.userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+        ui.imageUploadBtn.addEventListener('click', () => ui.imageUploadInput.click());
+        ui.removeImageBtn.addEventListener('click', () => {
+            uploadedImage = null;
+            ui.imageUploadInput.value = ''; // Reset file input
+            ui.imagePreviewContainer.classList.add('hidden');
+        });
+        ui.imageUploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImage = {
+                        mimeType: file.type,
+                        data: e.target.result.split(',')[1] // Get base64 part
+                    };
+                    ui.imagePreview.src = e.target.result;
+                    ui.imagePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        ui.messageContainer.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('action-plan-btn')) {
+                const button = e.target;
+                const emotion = button.dataset.emotion;
+                const cause = button.dataset.cause;
+                
+                button.textContent = 'Thinking...';
+                button.disabled = true;
+
+                const actionPlan = await callGeminiActionAPI(emotion, cause);
+                addMessage('bot', { response: actionPlan });
+                button.remove(); // Remove button after use
+            }
+        });
+
+        // --- SPEECH RECOGNITION ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+        let isRecording = false;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.onstart = () => { isRecording = true; ui.micBtn.classList.add('text-red-500', 'recording'); ui.userInput.placeholder = "Listening..."; };
+            recognition.onresult = (event) => { ui.userInput.value = event.results[0][0].transcript; handleSendMessage(); };
+            recognition.onerror = (event) => { console.error("Speech error:", event.error); addMessage('bot', { response: `Speech recognition error: ${event.error}` }); };
+            recognition.onend = () => { isRecording = false; ui.micBtn.classList.remove('text-red-500', 'recording'); ui.userInput.placeholder = "Type or press the mic..."; };
+            ui.micBtn.addEventListener('click', () => {
+                if (isRecording) { recognition.stop(); } else { try { recognition.start(); } catch(e) { console.error(e); addMessage('bot', { response: "Could not start listening. Please check microphone permissions." }); } }
+            });
+        } else {
+            ui.micBtn.style.display = 'none';
+        }
+
+        // --- JOURNAL & REPORT LOGIC (Using Local Storage) ---
+        async function loadJournalEntries() { 
+            const journal = storage.getJournal().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            ui.journalContent.innerHTML = '';
+            if (journal.length === 0) {
+                ui.journalContent.innerHTML = `<p class="text-gray-500">No journal entries yet. Save a reflection after a chat to see it here.</p>`;
+            } else {
+                journal.forEach(entry => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'journal-entry p-4 border dark:border-gray-700 rounded-lg';
+                    const date = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                    entryDiv.innerHTML = `
+                        <p class="text-sm font-semibold text-teal-600 dark:text-teal-400 mb-2">${date}</p>
+                        <p class="mb-2"><strong class="font-medium text-gray-800 dark:text-gray-200">You said:</strong> <span class="text-gray-600 dark:text-gray-300 italic">"${entry.userMessage}"</span></p>
+                        <p><strong class="font-medium text-gray-800 dark:text-gray-200">My reflection:</strong> <span class="text-gray-600 dark:text-gray-300">"${entry.botResponse}"</span></p>
+                    `;
+                    ui.journalContent.appendChild(entryDiv);
+                });
+            }
+            generateInsights();
+         }
+
+        async function generateInsights() {
+            const journal = storage.getJournal();
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            
+            const recentEntries = journal.filter(entry => new Date(entry.timestamp) >= sevenDaysAgo);
+
+            let negativeCount = 0;
+            const dayCounts = {};
+            recentEntries.forEach(entry => {
+                if(entry.surfaceEmotion === 'Negative' || entry.surfaceEmotion === 'Stressed' || entry.surfaceEmotion === 'Angry' || entry.surfaceEmotion === 'Sad') negativeCount++;
+                const day = new Date(entry.timestamp).toLocaleDateString('en-US', { weekday: 'long' });
+                dayCounts[day] = (dayCounts[day] || 0) + 1;
+            });
+            let insightText = "You're doing great! Keep reflecting on your mood.";
+            if (negativeCount >= 3) {
+                insightText = "It looks like you've had a few tough days this week. Remember, it's okay to reach out to a friend or mentor if you need to talk.";
+            } else if (recentEntries.length > 0) {
+                const mostFrequentDay = Object.keys(dayCounts).reduce((a, b) => dayCounts[a] > dayCounts[b] ? a : b);
+                if(mostFrequentDay) {
+                    insightText = `You've been most reflective on ${mostFrequentDay}s this week. Journaling is a powerful habit!`;
+                }
+            }
+            ui.journalInsights.textContent = insightText;
+        }
+
+        async function saveToJournal(userMessage, botResponse, surfaceEmotion, underlyingCause) {
+            const journal = storage.getJournal();
+            journal.push({
+                timestamp: new Date().toISOString(), 
+                userMessage, 
+                botResponse, 
+                surfaceEmotion, 
+                underlyingCause
+            });
+            storage.saveJournal(journal);
+            updateEGI(surfaceEmotion, true); // true for reflection bonus
+        }
+
+        async function updateEGI(surfaceEmotion, reflected = false) {
+            const profile = storage.getProfile();
+            let currentEgi = profile.egiScore;
+            
+            let adjustment = 0;
+            const lowerCaseEmotion = surfaceEmotion.toLowerCase();
+            if (['positive', 'happy', 'excited'].includes(lowerCaseEmotion)) adjustment = 1.0;
+            else if (['negative', 'sad', 'angry', 'stressed', 'anxious'].includes(lowerCaseEmotion)) adjustment = -1.5;
+            else if (lowerCaseEmotion === 'neutral') adjustment = 0.25;
+            if(reflected) adjustment += 1.0; // Bonus for saving a reflection
+
+            let newEgi = currentEgi + adjustment;
+            newEgi = Math.max(0, Math.min(100, newEGI)); // Clamp between 0-100
+
+            profile.egiScore = newEgi;
+            profile.lastUpdated = new Date().toISOString();
+            storage.saveProfile(profile);
+            ui.egiScore.textContent = newEgi.toFixed(0); // Update UI
+        }
+
+        async function generateMirrorReport() {
+            const journal = storage.getJournal();
+
+            if (journal.length < 10) {
+                ui.reportContent.innerHTML = `<p class="text-gray-500">You need at least 10 journal entries to generate a report. Keep reflecting to unlock your AI Personality Mirror!</p>`;
+                return;
+            }
+
+            ui.reportContent.innerHTML = `<p class="text-gray-500">✨ Generating your AI-powered report... This may take a moment.</p>`;
+
+            let journalString = "";
+            journal.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(entry => {
+                const date = new Date(entry.timestamp).toLocaleDateString();
+                journalString += `On ${date}, user felt ${entry.surfaceEmotion} (Cause: ${entry.underlyingCause}): "${entry.userMessage}"\n`;
+            });
+
+            const reportText = await callGeminiReportAPI(journalString);
+            
+            // Format the text for better HTML display (replace newlines with breaks)
+            const formattedReport = reportText.replace(/\n/g, '<br>');
+            ui.reportContent.innerHTML = `<div class="text-gray-700 dark:text-gray-200">${formattedReport}</div>`;
+        }
+        
+        // --- GEMINI API & MESSAGE HANDLING ---
+        
+        // Main API for chat
+        const callGeminiAPI = async (prompt, imageData = null) => {
+            // !! IMPORTANT: Add your Gemini API Key here !!
+            const apiKey = "AIzaSyCZks48hA72JhrgnMpRt9_a0lZsqU8OrQU", model = "gemini-2.5-flash", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const systemInstruction = { parts:[{ text:`You are Maan Mitra, an expert student psychologist AI.
+1.  **Multi-Layer Analysis**: Analyze the user's message (text/image) and identify two things:
+    - \`surfaceEmotion\`: A single, primary emotion (e.g., "Happy", "Sad", "Anxious", "Stressed", "Angry", "Neutral").
+    - \`underlyingCause\`: The likely reason for the emotion (e.g., "Academic Pressure", "Social Conflict", "Personal Achievement", "Lack of Confidence", "Fatigue", "N/A").
+2.  **Generate Reflection Prompt**: Based on the analysis, create a single, supportive, and natural-sounding \`reflectionPrompt\` to encourage the user to think deeper.
+3.  **Supportive Response**: Formulate a brief, empathetic \`response\` that acknowledges their feelings.
+4.  **JSON Output**: Your entire output MUST be a valid JSON object with keys: "surfaceEmotion", "underlyingCause", "response", "reflectionPrompt".` }] };
+            const responseSchema = {type:"OBJECT",properties:{surfaceEmotion:{type:"STRING"},underlyingCause:{type:"STRING"},response:{type:"STRING"},reflectionPrompt:{type:"STRING"}},required:["surfaceEmotion","underlyingCause","response","reflectionPrompt"]};
+            const parts = [{ text: prompt || "How are you feeling? You can also send an image." }];
+            if (imageData) { parts.push({ inlineData: { mimeType: imageData.mimeType, data: imageData.data }}); }
+            const payload = { contents: [{ parts }], systemInstruction, generationConfig:{responseMimeType:"application/json",responseSchema}};
+            
+            let retries = 3, delay = 1000;
+            while (retries > 0) {
+                try {
+                    const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                    if(response.ok) { 
+                        const result = await response.json(); 
+                        if(result.candidates?.[0]?.content.parts?.[0]) {
+                            let responseText = result.candidates[0].content.parts[0].text;
+                            responseText = responseText.replace(/```json\n?|\n?```/g, '');
+                            return JSON.parse(responseText); 
+                        } 
+                    }
+                } catch(error) { console.error("API call failed:", error); if (retries === 1) break; }
+                await new Promise(resolve => setTimeout(resolve, delay)); delay *= 2; retries--;
+            }
+            return {surfaceEmotion:"Error", response:"Sorry, I'm having trouble connecting right now. Please check your API key and internet connection.", reflectionPrompt:"Let's try again in a moment."};
+        };
+
+        // --- NEW: API for AI Action Plan ---
+        const callGeminiActionAPI = async (emotion, cause) => {
+            // !! IMPORTANT: Add your Gemini API Key here !!
+            const apiKey = "AIzaSyCZks48hA72JhrgnMpRt9_a0lZsqU8OrQU", model = "gemini-2.5-flash-preview-09-2025", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const systemInstruction = { parts: [{ text: `You are Maan Mitra. The user is feeling '${emotion}' due to '${cause}'. Suggest one, brief, actionable tip (1-2 sentences) to help them feel better right now. Be direct and encouraging. Example: 'Try the 5-4-3-2-1 grounding technique: name 5 things you see...'` }] };
+            const payload = { contents: [{ parts: [{ text: "Suggest an action" }] }], systemInstruction };
+            
+            try {
+                const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                if(response.ok) { 
+                    const result = await response.json(); 
+                    return result.candidates[0].content.parts[0].text;
+                }
+            } catch(error) { console.error("Action API failed:", error); }
+            return "Try taking five deep breaths, in through your nose and out through your mouth. It can really help.";
+        };
+
+        // --- NEW: API for AI Mirror Report ---
+        const callGeminiReportAPI = async (journalString) => {
+            // !! IMPORTANT: Add your Gemini API Key here !!
+            const apiKey = "AIzaSyCZks48hA72JhrgnMpRt9_a0lZsqU8OrQU", model = "gemini-2.5-flash-preview-09-2025", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const systemInstruction = { parts: [{ text: `You are an empathetic psychologist, Maan Mitra. A student has shared their journal with you. Based *only* on the entries below, write a short, 3-paragraph 'Personality Mirror Report' directly for them (using 'You'). 1. Start with their emotional strengths. 2. Identify their common stress triggers. 3. Conclude with a positive note on their growth trend. Keep it kind and insightful. \n\nJournal Entries:\n${journalString}` }] };
+            const payload = { contents: [{ parts: [{ text: "Write the report now." }] }], systemInstruction };
+
+            try {
+                const response = await fetch(apiUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                if(response.ok) { 
+                    const result = await response.json(); 
+                    return result.candidates[0].content.parts[0].text;
+                }
+            } catch(error) { console.error("Report API failed:", error); }
+            return "Could not generate the AI report at this time. Please check your API key and try again.";
+        };
+
+        function addMessage(sender, { response, conversationId = null, reflectionPrompt = null, analysisData = null, imageData = null }) {
+            const msgContainer = document.createElement('div');
+            msgContainer.className = `flex flex-col ${sender === 'user' ? 'items-end' : 'items-start'}`;
+            if(conversationId) { msgContainer.dataset.convId = conversationId; }
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble rounded-2xl p-3 shadow-sm relative';
+
+            if(imageData) {
+                const img = document.createElement('img');
+                img.src = `data:image/jpeg;base64,${imageData}`;
+                img.className = 'rounded-lg mb-2 max-w-xs';
+                bubble.appendChild(img);
+            }
+            if (response) { bubble.innerHTML += `<p>${response}</p>`; }
+
+            if (sender === 'user') { bubble.classList.add('bg-teal-500', 'text-white', 'rounded-br-lg'); }
+            else { bubble.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200', 'rounded-bl-lg'); }
+            msgContainer.appendChild(bubble);
+
+            if (reflectionPrompt) {
+                const reflectionBubble = document.createElement('div');
+                reflectionBubble.className = 'mt-2 text-sm bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-200 p-3 rounded-lg flex items-start space-x-2';
+                reflectionBubble.innerHTML = `<i class="fas fa-comment-dots mt-1"></i><span><strong>Reflection:</strong> ${reflectionPrompt}</span>`;
+                msgContainer.appendChild(reflectionBubble);
+            }
+
+            if (sender === 'bot' && conversationId && analysisData && analysisData.surfaceEmotion !== "Error") {
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'flex flex-wrap';
+
+                const saveBtn = document.createElement('button');
+                saveBtn.innerHTML = `<i class="fas fa-save"></i> Save Reflection`;
+                saveBtn.className = 'action-button save-journal-btn'; // Use new class
+                saveBtn.onclick = () => {
+                    const userMessageElement = document.querySelector(`[data-conv-id="${conversationId}"] .chat-bubble p`);
+                    const userMessage = userMessageElement ? userMessageElement.textContent : "Image-based reflection";
+                    saveToJournal(userMessage, analysisData.response, analysisData.surfaceEmotion, analysisData.underlyingCause);
+                    saveBtn.innerHTML = `<i class="fas fa-check"></i> Saved!`; 
+                    saveBtn.disabled = true;
+                };
+                buttonContainer.appendChild(saveBtn);
+
+                const isNegative = ['negative', 'sad', 'angry', 'stressed', 'anxious'].includes(analysisData.surfaceEmotion.toLowerCase());
+                if (isNegative) {
+                    const actionBtn = document.createElement('button');
+                    actionBtn.innerHTML = `✨ Suggest an Action`;
+                    actionBtn.className = 'action-button action-plan-btn';
+                    actionBtn.dataset.emotion = analysisData.surfaceEmotion;
+                    actionBtn.dataset.cause = analysisData.underlyingCause;
+                    buttonContainer.appendChild(actionBtn);
+                }
+
+                msgContainer.appendChild(buttonContainer);
+            }
+            ui.messageContainer.appendChild(msgContainer);
+            ui.chatWindow.scrollTop = ui.chatWindow.scrollHeight;
+        };
+        
+        async function handleSendMessage() {
+            const message = ui.userInput.value.trim();
+            if (!message && !uploadedImage) return;
+
+            const conversationId = Date.now();
+            const imageToSend = uploadedImage;
+            addMessage('user', { response: message, conversationId, imageData: imageToSend?.data });
+            
+            ui.userInput.value = '';
+            ui.removeImageBtn.click();
+            ui.sendBtn.disabled = true;
+            
+            const result = await callGeminiAPI(message, imageToSend);
+            
+            ui.sendBtn.disabled = false;
+            
+            if(result){
+                addMessage('bot', { 
+                    response: result.response,
+                    conversationId,
+                    reflectionPrompt: result.reflectionPrompt,
+                    analysisData: result
+                });
+                if(result.surfaceEmotion !== 'Error') {
+                    updateEGI(result.surfaceEmotion);
+                }
+            }
+        };
+    </script>
+</body>
+</html>
