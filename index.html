@@ -334,7 +334,7 @@
         // Main API for chat
         const callGeminiAPI = async (prompt, imageData = null) => {
             // !! IMPORTANT: Add your Gemini API Key here !!
-            const apiKey = "AIzaSyCZks48hA72JhrgnMpRt9_a0lZsqU8OrQU", model = "gemini-2.5-flash", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const apiKey = "YOUR GEMNI API KEY", model = "gemini-2.5-flash", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             const systemInstruction = { parts:[{ text:`You are Maan Mitra, an expert student psychologist AI.
 1.  **Multi-Layer Analysis**: Analyze the user's message (text/image) and identify two things:
     - \`surfaceEmotion\`: A single, primary emotion (e.g., "Happy", "Sad", "Anxious", "Stressed", "Angry", "Neutral").
@@ -368,7 +368,7 @@
         // --- NEW: API for AI Action Plan ---
         const callGeminiActionAPI = async (emotion, cause) => {
             // !! IMPORTANT: Add your Gemini API Key here !!
-            const apiKey = "AIzaSyCZks48hA72JhrgnMpRt9_a0lZsqU8OrQU", model = "gemini-2.5-flash-preview-09-2025", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const apiKey = "YOUR GEMINI API KEY", model = "gemini-2.5-flash-preview-09-2025", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             const systemInstruction = { parts: [{ text: `You are Maan Mitra. The user is feeling '${emotion}' due to '${cause}'. Suggest one, brief, actionable tip (1-2 sentences) to help them feel better right now. Be direct and encouraging. Example: 'Try the 5-4-3-2-1 grounding technique: name 5 things you see...'` }] };
             const payload = { contents: [{ parts: [{ text: "Suggest an action" }] }], systemInstruction };
             
@@ -385,7 +385,7 @@
         // --- NEW: API for AI Mirror Report ---
         const callGeminiReportAPI = async (journalString) => {
             // !! IMPORTANT: Add your Gemini API Key here !!
-            const apiKey = "AIzaSyCZks48hA72JhrgnMpRt9_a0lZsqU8OrQU", model = "gemini-2.5-flash-preview-09-2025", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const apiKey = "YOUR GEMINI API KEY", model = "gemini-2.5-flash-preview-09-2025", apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             const systemInstruction = { parts: [{ text: `You are an empathetic psychologist, Maan Mitra. A student has shared their journal with you. Based *only* on the entries below, write a short, 3-paragraph 'Personality Mirror Report' directly for them (using 'You'). 1. Start with their emotional strengths. 2. Identify their common stress triggers. 3. Conclude with a positive note on their growth trend. Keep it kind and insightful. \n\nJournal Entries:\n${journalString}` }] };
             const payload = { contents: [{ parts: [{ text: "Write the report now." }] }], systemInstruction };
 
@@ -488,4 +488,5 @@
         };
     </script>
 </body>
+
 </html>
